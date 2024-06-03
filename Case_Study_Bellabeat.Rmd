@@ -1,0 +1,581 @@
+---
+title: "Case Study Bellabeat"
+author: "Akilan Sivanandham"
+date: "2024-06-02"
+output:
+  html_document: default
+  pdf_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Bellabeat, a leading high-tech manufacturer of health-focused products
+for women, aims to answer key business questions by understanding and
+analyzing relevant data. We will use data from the FitBit Fitness
+Tracker, collected through a dispersed survey conducted from December 3,
+2016, to December 5, 2016, via Amazon Mechanical Turk. Thirty Fitbit
+users who met the eligibility requirements consented to submit their
+personal tracker data, which includes minute-by-minute output for heart
+rate, physical activity, and sleep tracking.
+
+We will clean and manipulate this dataset to ensure accurate and
+reliable analysis. Our approach will involve creating visualizations and
+employing statistical models to identify trends and patterns within the
+data.
+
+The analysis will provide actionable insights for Bellabeat, offering
+recommendations on how to refine its marketing strategy and enhance
+product development. Ultimately, our goal is to help Bellabeat better
+understand its customers and the market, enabling data-driven decisions
+on the following questions.
+
+### Our main focus on following questions
+
+-   What are the primary patterns in Bellabeat smart device utlization?
+-   How can the above insights enhance Bellabeat on its marketing
+    strategy and product development?
+-   What are the main opportunities and challenges that Bellabeat faces
+    in the smart device industry?
+
+### ASK
+
+##### Task
+
+Sršen has tasked you with analyzing smart device usage data to gain
+insights into how consumers use non-Bellabeat smart devices. Based on
+these insights, you are to select one Bellabeat product to focus on in
+your presentation
+
+###Prepare
+
+#### Loading packages
+
+In order to proceed further we need to looad following packages in our
+R-Studio environment
+
+```{r Load pakcages}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(highcharter)
+library(janitor)
+library(RColorBrewer)
+library(kableExtra)
+library(scales)
+library(readr)
+
+
+```
+
+#### Loading data
+
+uploadig data in to dataset. due to number of files, we use following
+method to load all the data and create dataset with appropriate names.
+
+```{r Load data}
+
+# Set the working directory which contain the download CSV files
+setwd('Data/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16')
+
+# Get all the CSV files names from the folder.
+csv_files <- list.files(pattern = '*.csv')
+
+#Read CSV files functions
+read_csv_files <- function(file_name){
+  read_csv(file_name)
+}
+
+data_frame <- lapply(csv_files, read_csv_files)
+
+#Create Data set name from the file
+
+create_dataset_name <- function(file_name)
+{
+   name <- tools::file_path_sans_ext(basename(file_name))
+
+   # Split the name by underscores
+  name_parts <- unlist(strsplit(name, "_"))
+  
+  # Remove the last part if there are more than one part
+  if (length(name_parts) > 1) {
+    name_parts <- name_parts[-length(name_parts)]
+  }
+  
+  # Combine the remaining parts
+  name <- paste(name_parts, collapse = "_")
+   
+   
+ # Insert underscores before capital letters and lowercase letters followed by capital letters
+  name <- gsub("([a-z])([A-Z])", "\\1_\\2", name)    # Insert underscore between lowercase and uppercase
+  name <- gsub("([A-Z])([A-Z][a-z])", "\\1_\\2", name) # Insert underscore before subsequent capital letters
+  
+  # Ensure all parts are capitalized correctly and join with underscores
+  name_parts <- unlist(strsplit(name, "_"))
+  name <- paste(name_parts, collapse = "_")
+  
+  name
+}
+
+# Assign data frames to dynamically created names
+for (i in seq_along(csv_files)) {
+  dataset_name <- create_dataset_name(csv_files[i])
+  assign(dataset_name, data_frame[[i]], envir = .GlobalEnv)
+}
+
+
+# List the names of the created datasets
+created_datasets <- sapply(csv_files, create_dataset_name)
+print(created_datasets)
+
+
+
+```
+
+```{r check the data}
+head(daily_Activity)
+```
+
+### Process
+
+Lets check the glimpse of data, to understand the data and its type.
+
+```{r check the Glimpse of dataset}
+# Glimpse of all datasets
+for (dataset_name in created_datasets) {
+  cat("Dataset:", dataset_name, "\n")
+  glimpse(get(dataset_name))
+  cat("\n\n")
+}
+```
+
+#### Split the Date and time for Datasets.
+
+In order to process further, we need to split date and time from the
+following dataset in differnt column.
+
+-   ***heartrate_seconds*** - Dataset about the information of heart
+    rate by seconds
+
+-   ***hourly_Calories*** - Dataset about the information of Calories by
+    hourly
+
+-   ***hourly_Intensities*** - Dataset about the information of
+    Intensities by hourly
+
+-   ***hourly_Steps*** - Dataset about the information of Steps by
+    hourly
+
+-   ***sleep_Day*** - Dataset about the information of Sleeping hours by
+    day
+
+-   ***weight_Log_Info*** - Dataset about the information of Weight
+
+```{r Modifying and adding new columns}
+# heartrate_seconds
+heartrate_seconds$Time = as.POSIXct(heartrate_seconds$Time,format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+heartrate_seconds$date <- format(heartrate_seconds$Time, format = "%m/%d/%y")
+heartrate_seconds$time <- format(heartrate_seconds$Time, format = "%H:%M:%S")
+glimpse(heartrate_seconds)
+head(heartrate_seconds)
+
+#hourly_Calories
+hourly_Calories$ActivityHour = as.POSIXct(hourly_Calories$ActivityHour,format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+hourly_Calories$date <- format(hourly_Calories$ActivityHour, format = "%m/%d/%y")
+hourly_Calories$time<- format(hourly_Calories$ActivityHour, format = "%H:%M:%S")
+glimpse(hourly_Calories)
+head(hourly_Calories)
+
+#hourly_Intensities
+hourly_Intensities$ActivityHour=as.POSIXct(hourly_Intensities$ActivityHour,format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+hourly_Intensities$date <- format(hourly_Intensities$ActivityHour, format = "%m/%d/%y")
+hourly_Intensities$time<- format(hourly_Intensities$ActivityHour, format = "%H:%M:%S")
+glimpse(hourly_Intensities)
+head(hourly_Intensities)
+
+#sleep_Day
+sleep_Day$SleepDay=as.POSIXct(sleep_Day$SleepDay, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+sleep_Day$date <- format(sleep_Day$SleepDay, format = "%m/%d/%y")
+sleep_Day$time <- format(sleep_Day$SleepDay, format = "%H:%M:%S")
+glimpse(sleep_Day)
+head(sleep_Day)
+
+#hourly_Steps
+hourly_Steps$ActivityHour=as.POSIXct(hourly_Steps$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+hourly_Steps$date <- format(hourly_Steps$ActivityHour, format = "%m/%d/%y")
+hourly_Steps$time <- format(hourly_Steps$ActivityHour, format = "%H:%M:%S")
+glimpse(hourly_Steps)
+head(hourly_Steps)
+
+
+#
+weight_Log_Info$Date=as.POSIXct(weight_Log_Info$Date, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+weight_Log_Info$date <- format(weight_Log_Info$Date, format = "%m/%d/%y")
+weight_Log_Info$time <- format(weight_Log_Info$Date, format = "%H:%M:%S")
+glimpse(weight_Log_Info)
+head(weight_Log_Info)
+
+```
+
+#### Cleaning Data
+
+Checking for duplicates and removing it.
+
+```{r find and remove duplicates}
+
+# loop
+for(dataset_name in created_datasets)
+{
+  cat("Dataset:", dataset_name, "\n")
+  df <- get(dataset_name)
+  
+  initial_rows <- nrow(df) # get the number of rows before the process
+  df <- df %>% distinct() # remove duplicates
+  final_rows <- nrow(df) # get the number of rows after the process
+  
+  
+  duplicates_removed <- initial_rows - final_rows
+  
+  cat("Initial rows:", initial_rows, "\n")
+  
+  cat("Final rows:", final_rows, "\n")
+  cat("Duplicates removed:", duplicates_removed, "\n\n")
+
+  assign(dataset_name, df, envir = .GlobalEnv) # assign the cleaned dataset to the environment
+  
+}
+
+```
+
+#### Unique data
+
+Next we need to find number of unique data present in the dataset
+
+```{r find the unique data}
+for(dataset_name in created_datasets)
+{
+  cat("Dataset:", dataset_name, "\n")
+  df <- get(dataset_name)
+  num_unique <- n_distinct(df$Id)
+  cat("Number of Unique values in 'Id':", num_unique, "\n\n")
+  
+}
+
+
+```
+
+From the above findings **heartrate_seconds, sleep_Day and
+weight_Log_Info** have some inconsistency in data.
+
+Especially **heartrate_seconds,** **weight_Log_Info** have only 14 and 8
+unique id respectively, it can be biased data. so, this two are not
+reliable to analyze further.
+
+#### Merge data
+
+while exploring data, Daily Activity(daily_Activity) have all the
+informations except sleep data (sleep_day), so we need to combain those
+data. In order to do that we need to check compactablity of column names
+
+```{r column names}
+
+colnames(daily_Activity)
+colnames(sleep_Day)
+```
+
+From the above results, we can merge the daily_Activity with sleep_Day
+using ID and Data.
+
+```{r merge daily_Activity and sleep_Day}
+# Ensure the date columns are in the same format
+daily_Activity <- daily_Activity %>%
+  mutate(ActivityDate = as.Date(ActivityDate, format = "%m/%d/%Y"))
+
+# Merge the datasets on the 'Id' and corresponding date columns
+daily_Activity_Sleep_merged <- merge(daily_Activity, sleep_Day, by.x = c("Id", "ActivityDate"), by.y = c("Id", "date"), all = TRUE)
+
+# Print the merged dataset
+head(daily_Activity_Sleep_merged)
+```
+
+#### Weekday calculation
+
+```{r}
+# Add weekday column and order it
+weekday_Avg <- daily_Activity %>%
+  mutate(weekday = weekdays(ActivityDate)) %>%
+  mutate(weekday = factor(weekday, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"), ordered = TRUE))
+
+# Calculate average daily calories and steps for each weekday
+weekday_Avg <- weekday_Avg %>%
+  group_by(weekday) %>%
+  summarize(
+    AvgDaily_Cal = mean(Calories, na.rm = TRUE),
+    AvgDaily_Steps = mean(TotalSteps, na.rm = TRUE)
+  )
+
+
+```
+
+### Analysis
+
+Our data ready for analyse phase
+
+#### Summary
+
+Sleep summary on daily_Activity_Sleep_merged
+
+```{r daily sleep summary}
+daily_Activity_Sleep_merged %>%
+  mutate(TotalHoursAsleep = TotalMinutesAsleep / 60, TotalHoursInBed = TotalTimeInBed /60) %>%
+  select(TotalHoursAsleep, TotalHoursInBed) %>%
+  summary()
+
+
+```
+
+From the above finding, average hours of sleep is 6.9, which is very
+close to the recommended hours of sleep.
+
+Daily Activity Summary
+
+```{r Activity summary}
+
+
+daily_Activity %>% select(LightlyActiveMinutes, FairlyActiveMinutes, VeryActiveMinutes) %>% summary()
+
+
+daily_Activity %>% select( LightActiveDistance, ModeratelyActiveDistance, VeryActiveDistance) %>% summary()
+
+
+daily_Activity%>% select(TotalSteps,Calories)%>% summary()
+
+daily_Activity%>% mutate(sedentaryHours = SedentaryMinutes /60) %>%
+  select(sedentaryHours, SedentaryActiveDistance)%>%summary()
+```
+
+Sedentary Hours on Average person is much higher than normal.
+
+#### Steps taken vs Calories
+
+```{r}
+
+ggplot(data = daily_Activity, mapping = aes(x = TotalSteps, y = Calories)) + 
+  geom_point(aes(colour = Calories), alpha = 0.7, size = 3) +
+  geom_smooth(method = "lm", se = FALSE, colour = "blue", linetype = "dashed") +
+  scale_color_gradient(low = "yellow", high = "red") +
+  labs(
+    title = "Relationship Between Steps Taken and Calories Burned",
+   
+    x = "Total Steps",
+    y = "Calories Burned",
+    caption = "Source: Fitness Tracker Data"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "right"
+  )
+
+
+```
+
+This visualization effectively communicates the positive relationship
+between daily steps and calories burned, suggesting that increased
+physical activity, measured in steps, leads to higher calorie
+expenditure.
+
+#### Compare different types of active minutes: VeryActiveMinutes, FairlyActiveMinutes, and LightlyActiveMinutes.
+
+```{r}
+active_minutes <- daily_Activity %>%
+  select(Id, ActivityDate, VeryActiveMinutes, FairlyActiveMinutes, LightlyActiveMinutes) %>%
+  gather(key = "ActivityType", value = "Minutes", VeryActiveMinutes, FairlyActiveMinutes, LightlyActiveMinutes)
+
+ggplot(data = active_minutes, mapping = aes(x = ActivityType, y = Minutes, fill = ActivityType)) + 
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Comparison of Different Types of Active Minutes",
+    x = "Activity Type",
+    y = "Minutes",
+    caption = "Source: Fitness Tracker Data"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "none"
+  )
+```
+
+The bar plot compares different types of active minutes, including very
+active minutes, fairly active minutes, and lightly active minutes. By
+transforming the dataset, this visualization allows for a side-by-side
+comparison of how different intensities of activity contribute to
+overall physical activity. The plot provides insight into the
+distribution of various activity levels among the users, revealing that
+users spend more time in light active states compare to others.
+
+#### Distribution of TotalDistance
+
+```{r}
+ggplot(data = daily_Activity, mapping = aes(x = TotalDistance)) + 
+  geom_histogram(binwidth = 0.5, fill = "steelblue", color = "black", alpha = 0.7) +
+  labs(
+    title = "Distribution of Total Distance Covered",
+    x = "Total Distance (miles)",
+    y = "Frequency",
+    caption = "Source: Fitness Tracker Data"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+```
+
+This histogram displays the distribution of total distance covered by
+individuals. By binning the total distance into intervals, the plot
+shows the frequency of different distance ranges. This visualization
+helps identify common distance ranges covered by users and highlights
+the overall activity levels in terms of distance. It can reveal whether
+most users tend to walk short distances daily or if there are a
+significant number of users covering larger distances.
+
+#### TotalSteps and Calories vary over ActivityDate
+
+```{r}
+daily_Activity <- daily_Activity %>%
+  mutate(ActivityDate = as.Date(ActivityDate, format = "%m/%d/%Y"))
+
+ggplot(data = daily_Activity, mapping = aes(x = ActivityDate)) + 
+  geom_line(aes(y = TotalSteps, color = "Total Steps")) +
+  geom_line(aes(y = Calories, color = "Calories")) +
+  scale_color_manual(values = c("Total Steps" = "blue", "Calories" = "red")) +
+  labs(
+    title = "Daily Steps and Calories Burned Over Time",
+    x = "Date",
+    y = "Count",
+    color = "Legend",
+    caption = "Source: Fitness Tracker Data"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "bottom"
+  )
+```
+
+The line plot shows how total steps and calories burned vary over time,
+using the ActivityDate as the x-axis. By plotting both variables on the
+same graph, the plot provides a temporal view of the relationship
+between steps taken and calories burned. This visualization helps to
+identify trends and patterns in daily activity and calorie expenditure
+over time, such as seasonal variations, changes in activity levels, or
+the impact of specific events. The plot underscores the consistency or
+fluctuations in users' physical activity and caloric burn.
+
+#### Weekday
+
+Average Daily Calories Burned and Steps Taken by Weekday
+
+```{r}
+# Reshape the data for faceting
+weekday_Avg_long <- weekday_Avg %>%
+  pivot_longer(cols = c(AvgDaily_Cal, AvgDaily_Steps), names_to = "Metric", values_to = "Value")
+
+# Create a faceted bar plot
+ggplot(data = weekday_Avg_long, aes(x = weekday, y = Value, fill = weekday)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  facet_wrap(~ Metric, scales = "free_y") +
+  labs(
+    title = "Average Daily Calories Burned and Steps Taken by Weekday",
+    x = "Weekday",
+    y = "Average Value",
+    fill = "Metric",
+    caption = "Source: Fitness Tracker Data"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)
+  )
+```
+
+The data clearly shows on Monday, Tuesday and Saturday, have more steps
+taken and due to that more calories burned.
+
+### Share
+
+-   Daily steps and calories burned exhibit a positive correlation,
+    indicating that increasing step count correlates with higher calorie
+    expenditure.
+
+-   Step count and activity intensity demonstrate a positive
+    relationship, suggesting that more vigorous activity is necessary to
+    achieve higher step counts.
+
+-   There's a logical association between time spent in bed and minutes
+    of sleep, implying that longer time in bed corresponds to longer
+    sleep duration.
+
+-   No discernible correlation exists between exercise intensity and
+    sleep duration, indicating that heavy activity doesn't significantly
+    impact sleep duration.
+
+-   On average, peak activity levels are observed on Saturdays,
+    Tuesdays, and Mondays, with individuals engaging in more vigorous
+    activity early in the week and reaching maximum activity levels on
+    Saturdays.
+
+### ACT
+
+-   BellaBeat could implement a feature to analyze users' activity
+    patterns and suggest personalized strategies to increase overall
+    physical activity levels, such as taking short active breaks
+    throughout the day or incorporating activities into daily routines.
+
+-   To promote better sleep quality, BellaBeat can offer personalized
+    sleep hygiene tips and reminders, such as maintaining a consistent
+    sleep schedule, creating a relaxing bedtime routine, and minimizing
+    screen time before bed.
+
+-   BellaBeat can provide insights into users' sedentary behavior and
+    encourage them to break up prolonged sitting periods with brief
+    movement breaks or light stretching exercises.
+
+-   Incorporating amification elements, BellaBeat could introduce
+    challenges and rewards to motivate users to achieve their activity
+    goals, fostering a sense of accomplishment and social interaction
+    within the BellaBeat community.
+
+-   BellaBeat can leverage wearable technology to track users' heart
+    rate variability (HRV) and provide personalized stress management
+    recommendations, such as breathing exercises, mindfulness practices,
+    or guided relaxation sessions.
+
+-   To enhance accountability and motivation, BellaBeat could offer
+    social sharing features, allowing users to connect with friends or
+    join virtual fitness groups to share progress, provide
+    encouragement, and participate in friendly competitions.
+
+-   BellaBeat can integrate with third-party fitness apps and devices to
+    provide a comprehensive overview of users' health and wellness data,
+    enabling seamless synchronization and holistic insights into their
+    lifestyle habits.
+
+-   BellaBeat could offer educational resources and articles on topics
+    related to physical activity, nutrition, sleep, stress management,
+    and overall well-being to empower users with knowledge and support
+    informed decision-making.
